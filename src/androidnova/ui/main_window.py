@@ -36,8 +36,11 @@ class MainWindow:
         env = tk.LabelFrame(frame, text="Ambiente Windows", padx=12, pady=10)
         env.pack(fill="x")
         tk.Label(env, textvariable=self.environment, justify="left", anchor="w", wraplength=700).pack(fill="x")
-        env_buttons = tk.Frame(env, pady=(8, 0))
-        env_buttons.pack(fill="x")
+        # ``pady`` on the Frame constructor is a Tk geometry option that expects
+        # one distance value. A tuple such as (8, 0) must be supplied to pack()
+        # instead; otherwise Tcl/Tk raises ``bad screen distance "8 0"``.
+        env_buttons = tk.Frame(env)
+        env_buttons.pack(fill="x", pady=(8, 0))
         tk.Button(env_buttons, text="Configurar / procurar componentes", command=self._open_setup).pack(side="left")
         tk.Button(env_buttons, text="Verificar", command=self._refresh_environment).pack(side="left", padx=8)
 
