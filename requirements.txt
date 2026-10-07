@@ -1,0 +1,2 @@
+# AndroidNova intentionally uses only Python standard-library modules in milestone 1.
+# Tkinter is bundled with the standard Windows Python installer.
