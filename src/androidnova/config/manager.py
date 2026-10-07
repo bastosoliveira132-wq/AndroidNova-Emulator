@@ -21,14 +21,17 @@ class VMConfig:
 class PathConfig:
     qemu: str = "qemu-system-x86_64"
     adb: str = "adb"
-    android_image: str = "images/android.qcow2"
+    android_image: str = "images/android-x86_64.iso"
+    serial_log: str = "logs/qemu-serial.log"
 
 
 @dataclass
 class QEMUConfig:
     machine: str = "q35"
     acceleration: bool = True
+    accelerator: str = "whpx"
     display_backend: str = "sdl"
+    media_type: str = "auto"
     extra_args: list[str] = field(default_factory=list)
 
 
@@ -36,6 +39,8 @@ class QEMUConfig:
 class ADBConfig:
     host: str = "127.0.0.1"
     port: int = 5555
+    connect_timeout_seconds: int = 90
+    poll_interval_seconds: float = 2.0
 
 
 @dataclass
@@ -64,10 +69,27 @@ class AppConfig:
             raise ValueError("ram_mb must be at least 512")
         if self.vm.cpu_count < 1:
             raise ValueError("cpu_count must be at least 1")
+        width, height = self.resolution_size()
+        if width < 320 or height < 240:
+            raise ValueError("resolution must be at least 320x240")
         if self.adb.port < 1 or self.adb.port > 65535:
             raise ValueError("ADB port must be between 1 and 65535")
-        if "x" not in self.vm.resolution.lower():
+        if self.adb.connect_timeout_seconds < 1:
+            raise ValueError("ADB connect timeout must be at least 1 second")
+        if self.adb.poll_interval_seconds <= 0:
+            raise ValueError("ADB poll interval must be greater than zero")
+        if self.qemu.media_type not in {"auto", "iso", "disk"}:
+            raise ValueError("qemu.media_type must be auto, iso, or disk")
+
+    def resolution_size(self) -> tuple[int, int]:
+        value = self.vm.resolution.lower().replace(" ", "")
+        parts = value.split("x")
+        if len(parts) != 2:
             raise ValueError("resolution must use WIDTHxHEIGHT format")
+        try:
+            return int(parts[0]), int(parts[1])
+        except ValueError as exc:
+            raise ValueError("resolution must use numeric WIDTHxHEIGHT format") from exc
 
 
 def load_config(path: Path) -> AppConfig:
@@ -76,6 +98,7 @@ def load_config(path: Path) -> AppConfig:
 
 
 def save_config(config: AppConfig, path: Path) -> None:
+    config.validate()
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         json.dump(config.to_dict(), handle, indent=2)
