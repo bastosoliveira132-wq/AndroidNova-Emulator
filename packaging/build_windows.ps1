@@ -4,8 +4,8 @@ $dist = Join-Path (Get-Location) "dist"
 if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
 $build = Join-Path (Get-Location) "build"
 if (Test-Path $build) { Remove-Item $build -Recurse -Force }
-py -3 -m pip install -r packaging\requirements-build.txt
-py -3 -m PyInstaller --noconfirm --clean packaging\androidnova.spec
+python -m pip install -r packaging\requirements-build.txt
+python -m PyInstaller --noconfirm --clean packaging\androidnova.spec
 Copy-Item README.md (Join-Path $dist "AndroidNova-Emulator\README.md")
 $zip = Join-Path $dist "AndroidNova-Emulator-Test.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
