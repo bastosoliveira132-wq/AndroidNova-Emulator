@@ -17,17 +17,32 @@ def application_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def bundled_example_path(root: Path) -> Path:
+    """Locate the bundled example configuration in source and PyInstaller builds."""
+    candidates = [root / "config" / "example.json"]
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            candidates.insert(0, Path(meipass) / "config" / "example.json")
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return candidates[0]
+
+
 ROOT = application_root()
 CONFIG_DIR = ROOT / "config"
 CONFIG_PATH = CONFIG_DIR / "local.json"
-EXAMPLE_PATH = CONFIG_DIR / "example.json"
 
 
 def ensure_config() -> Path:
     if CONFIG_PATH.exists():
         return CONFIG_PATH
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    data = json.loads(EXAMPLE_PATH.read_text(encoding="utf-8"))
+    example_path = bundled_example_path(ROOT)
+    if not example_path.is_file():
+        raise FileNotFoundError(f"Bundled example configuration not found: {example_path}")
+    data = json.loads(example_path.read_text(encoding="utf-8"))
     CONFIG_PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return CONFIG_PATH
 
