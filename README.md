@@ -14,11 +14,11 @@ The repository does **not** contain, download, or redistribute an Android system
 
 ## Expected Android guest media
 
-The simplest supported first test is a **bootable Android x86_64 ISO** (`.iso`). Android-x86 publishes x86_64 ISO releases and documents running the ISO with QEMU. The project accepts an ISO directly as QEMU CD-ROM media. citeturn2search2turn2search1
+The simplest supported first test is a **bootable Android x86_64 ISO** (`.iso`). Android-x86 publishes x86_64 ISO releases and documents running the ISO with QEMU. See the official [Android-x86 download page](https://www.android-x86.org/download) and [QEMU How-To](https://www.android-x86.org/documentation/qemu.html).
 
 The project can also boot a local disk image. For disk media, the configured QEMU format must match the actual file (`qcow2` by default, with `raw`, `vmdk`, `vdi`, and `vhdx` supported by configuration). AndroidNova does not convert or manufacture an Android disk image for the user.
 
-For the first milestone, prefer an Android x86_64 ISO because it avoids pretending that an arbitrary `.qcow2` file is a valid Android guest. The official Android-x86 documentation also describes QEMU/KVM execution of an ISO and ADB through TCP port 5555. citeturn2search1turn2search0
+For the first milestone, prefer an Android x86_64 ISO because it avoids pretending that an arbitrary `.qcow2` file is a valid Android guest. The Android-x86 documentation also describes QEMU/KVM execution of an ISO and ADB through TCP port 5555.
 
 ## Architecture
 
@@ -59,9 +59,9 @@ images/              # User-provided guest media (ignored by Git)
 - A QEMU build containing `qemu-system-x86_64.exe`.
 - Android Debug Bridge (`adb.exe`), normally from the Android SDK Platform-Tools.
 - A user-provided Android x86_64 ISO or compatible disk image.
-- For acceleration, Windows Hypervisor Platform must be installed/enabled. QEMU documents WHPX as its Windows hardware-acceleration backend. citeturn1search1
+- For acceleration, Windows Hypervisor Platform must be installed/enabled. QEMU documents WHPX as its Windows hardware-acceleration backend.
 
-QEMU's current documentation recommends checking the capabilities of the installed binary itself (`-machine help`, `-device help`, etc.) instead of assuming that every build exposes identical devices. AndroidNova therefore keeps optional QEMU arguments configurable rather than inventing guest-specific boot flags. citeturn1search4turn0search3
+QEMU's current documentation recommends checking the capabilities of the installed binary itself (`-machine help`, `-device help`, etc.) instead of assuming that every build exposes identical devices. AndroidNova therefore keeps optional QEMU arguments configurable rather than inventing guest-specific boot flags.
 
 ## Installing QEMU and ADB
 
@@ -76,7 +76,7 @@ qemu-system-x86_64.exe --version
 adb.exe version
 ```
 
-If WHPX acceleration is enabled, also verify that the Windows Hypervisor Platform feature is installed. QEMU documents the Windows feature requirement and the `-accel whpx` invocation. citeturn1search1
+If WHPX acceleration is enabled, also verify that the Windows Hypervisor Platform feature is installed. QEMU documents the Windows feature requirement and the `-accel whpx` invocation.
 
 ## Supplying the Android image
 
@@ -130,7 +130,7 @@ ADB: conectado
 
 ## ADB flow
 
-AndroidNova forwards the configured host ADB port to guest TCP port 5555 by default. The Android-x86 documentation describes the same general model: guest ADB on port 5555 plus QEMU user-network forwarding, followed by `adb connect` to the host-side forwarded port. citeturn2search0
+AndroidNova forwards the configured host ADB port to guest TCP port 5555 by default. The Android-x86 documentation describes the same general model: guest ADB on port 5555 plus QEMU user-network forwarding, followed by `adb connect` to the host-side forwarded port.
 
 Manual verification after Android is ready:
 
@@ -145,13 +145,13 @@ The application also performs this connection itself and checks `adb devices` pl
 
 AndroidNova deliberately does not hard-code a kernel/initrd/EFI combination that has not been verified against the supplied Android build. A bootable Android-x86 ISO normally contains the bootloader/kernel needed to start from CD-ROM, while custom disk/kernel layouts may require different firmware or boot arguments.
 
-If a particular Android build requires extra QEMU options, place them in `qemu.extra_args` after validating them against the installed QEMU binary and that guest build. QEMU's documentation explicitly supports inspecting available machines/devices with `-machine help` and `-device help`. citeturn2search1turn1search4
+If a particular Android build requires extra QEMU options, place them in `qemu.extra_args` after validating them against the installed QEMU binary and that guest build. QEMU's documentation explicitly supports inspecting available machines/devices with `-machine help` and `-device help`.
 
 ## Display, audio and network
 
 - Display uses the configured QEMU frontend (`sdl` by default). The `resolution` setting is retained as a VM preference; it is **not** falsely translated into a generic QEMU flag because Android guest resolution depends on the guest graphics stack.
-- Audio uses QEMU's native Windows DirectSound backend on Windows and SDL elsewhere, with an AC97 guest device. QEMU documents DirectSound as a Windows-only audio backend and AC97 as a supported PC audio device. citeturn1search0
-- Network uses QEMU user-mode networking and `virtio-net-pci`, with the ADB TCP port forwarded from host to guest. QEMU documents `hostfwd` for this exact type of host-to-guest TCP forwarding. citeturn0search3
+- Audio uses QEMU's native Windows DirectSound backend on Windows and SDL elsewhere, with an AC97 guest device. QEMU documents DirectSound as a Windows-only audio backend and AC97 as a supported PC audio device.
+- Network uses QEMU user-mode networking and `virtio-net-pci`, with the ADB TCP port forwarded from host to guest. QEMU documents `hostfwd` for this exact type of host-to-guest TCP forwarding.
 - A serial log is written to `logs/qemu-serial.log`. This is diagnostic output; the Android image must expose useful serial output for it to contain guest boot messages.
 
 ## Tests
