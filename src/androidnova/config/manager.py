@@ -32,6 +32,7 @@ class QEMUConfig:
     accelerator: str = "whpx"
     display_backend: str = "sdl"
     media_type: str = "auto"
+    disk_format: str = "qcow2"
     extra_args: list[str] = field(default_factory=list)
 
 
@@ -80,6 +81,10 @@ class AppConfig:
             raise ValueError("ADB poll interval must be greater than zero")
         if self.qemu.media_type not in {"auto", "iso", "disk"}:
             raise ValueError("qemu.media_type must be auto, iso, or disk")
+        if self.qemu.disk_format not in {"qcow2", "raw", "vmdk", "vdi", "vhdx"}:
+            raise ValueError("unsupported disk format")
+        if not self.adb.host.strip():
+            raise ValueError("ADB host cannot be empty")
 
     def resolution_size(self) -> tuple[int, int]:
         value = self.vm.resolution.lower().replace(" ", "")
