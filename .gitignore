@@ -32,3 +32,4 @@ config/local.json
 build/
 dist/
 *.spec
+!packaging/*.spec
