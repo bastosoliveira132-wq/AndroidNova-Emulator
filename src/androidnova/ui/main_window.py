@@ -25,7 +25,9 @@ class MainWindow:
         self.environment = tk.StringVar(value="Verificando ambiente...")
         self._build()
         self._refresh_status()
-        self._refresh_environment()
+        # Run dependency probing after the window is created so a slow Windows
+        # probe (for example DISM/WHPX) cannot prevent the GUI from appearing.
+        self.root.after(50, self._refresh_environment)
 
     def _build(self) -> None:
         frame = tk.Frame(self.root, padx=18, pady=18)
@@ -36,9 +38,8 @@ class MainWindow:
         env = tk.LabelFrame(frame, text="Ambiente Windows", padx=12, pady=10)
         env.pack(fill="x")
         tk.Label(env, textvariable=self.environment, justify="left", anchor="w", wraplength=700).pack(fill="x")
-        # ``pady`` on the Frame constructor is a Tk geometry option that expects
-        # one distance value. A tuple such as (8, 0) must be supplied to pack()
-        # instead; otherwise Tcl/Tk raises ``bad screen distance "8 0"``.
+        # ``pady`` on the Frame constructor expects one Tk distance. A tuple
+        # such as (8, 0) belongs to pack()/grid(), not the widget constructor.
         env_buttons = tk.Frame(env)
         env_buttons.pack(fill="x", pady=(8, 0))
         tk.Button(env_buttons, text="Configurar / procurar componentes", command=self._open_setup).pack(side="left")
