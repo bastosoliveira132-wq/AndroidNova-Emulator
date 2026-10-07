@@ -50,7 +50,6 @@ def _candidate_paths(configured: str, names: tuple[str, ...]) -> list[Path]:
         if resolved:
             candidates.append(Path(resolved))
     if os.name == "nt":
-        program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
         local_app = Path(os.environ.get("LOCALAPPDATA", ""))
         user_profile = Path(os.environ.get("USERPROFILE", ""))
         if "adb.exe" in names:
@@ -86,10 +85,11 @@ def detect_qemu(config: AppConfig) -> DependencyStatus:
     path = resolve_qemu_executable(config.paths.qemu)
     if path is None:
         configured = Path(config.paths.qemu).name.lower()
-        if configured.startswith("qemu-w64-setup-"):
-            message = "Instalador do QEMU informado; selecione qemu-system-x86_64.exe"
-        else:
-            message = "qemu-system-x86_64.exe não encontrado"
+        message = (
+            "Instalador do QEMU informado; selecione qemu-system-x86_64.exe"
+            if configured.startswith("qemu-w64-setup-")
+            else "qemu-system-x86_64.exe não encontrado"
+        )
         return DependencyStatus("QEMU", False, None, None, message)
     version = _probe(path, ("--version",))
     return DependencyStatus("QEMU", True, str(path), version, "QEMU x86_64 encontrado")
@@ -104,6 +104,15 @@ def detect_adb(config: AppConfig) -> DependencyStatus:
     return DependencyStatus("ADB", True, str(path), version, "ADB encontrado")
 
 
+def _is_valid_iso(path: Path) -> bool:
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0x8001)
+            return handle.read(5) == b"CD001"
+    except OSError:
+        return False
+
+
 def _looks_like_android_media(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -112,7 +121,9 @@ def _looks_like_android_media(path: Path) -> bool:
             return False
     except OSError:
         return False
-    return path.suffix.lower() in {".iso", ".img", ".raw", ".qcow2", ".vmdk", ".vdi", ".vhd", ".vhdx"}
+    if path.suffix.lower() == ".iso":
+        return _is_valid_iso(path)
+    return path.suffix.lower() in {".img", ".raw", ".qcow2", ".vmdk", ".vdi", ".vhd", ".vhdx"}
 
 
 def detect_guest_media(config: AppConfig, root: Path) -> GuestMediaStatus:
@@ -133,9 +144,7 @@ def detect_guest_media(config: AppConfig, root: Path) -> GuestMediaStatus:
         kind = "ISO" if resolved.suffix.lower() == ".iso" else "disk image"
         return GuestMediaStatus(True, str(resolved), kind, "Mídia candidata encontrada")
     configured_display = str(configured if configured.is_absolute() else root / configured)
-    if configured_display:
-        return GuestMediaStatus(False, None, None, f"Mídia Android não encontrada, vazia ou inválida: {configured_display}")
-    return GuestMediaStatus(False, None, None, "Nenhuma imagem Android configurada/encontrada")
+    return GuestMediaStatus(False, None, None, f"Mídia Android não encontrada, vazia ou inválida: {configured_display}")
 
 
 def detect_whpx() -> bool:
