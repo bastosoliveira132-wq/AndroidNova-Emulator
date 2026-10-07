@@ -12,6 +12,34 @@ AndroidNova -> QEMU -> Android x86_64 guest -> ADB
 
 The repository does **not** contain, download, or redistribute an Android system image. The user must obtain a compatible image from its publisher and configure its local path.
 
+## Windows test package
+
+The repository now includes a Windows packaging path based on PyInstaller. The generated package is a desktop-interface test build; it does **not** bundle QEMU, ADB, or an Android system image.
+
+On Windows, the packaging script is:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build_windows.ps1
+```
+
+It installs the build-only PyInstaller dependency, creates a PyInstaller `onedir` build, writes it under `dist\AndroidNova-Emulator\`, and creates:
+
+```text
+dist\AndroidNova-Emulator-Test.zip
+```
+
+The GitHub Actions workflow `Windows test package` performs the same build on a Windows runner and smoke-tests that `AndroidNova-Emulator.exe` can start its Tkinter interface before uploading the ZIP as a workflow artifact.
+
+The test package intentionally contains only the application and its example configuration. It does not contain proprietary/protected Android guest media or external QEMU/ADB binaries.
+
+For a source checkout without building an EXE, Windows users can run:
+
+```powershell
+.\run_windows.bat
+```
+
+This source launcher requires Python 3.11+.
+
 ## Expected Android guest media
 
 The simplest supported first test is a **bootable Android x86_64 ISO** (`.iso`). Android-x86 publishes x86_64 ISO releases and documents running the ISO with QEMU. See the official [Android-x86 download page](https://www.android-x86.org/download) and [QEMU How-To](https://www.android-x86.org/documentation/qemu.html).
@@ -48,6 +76,8 @@ src/androidnova/
 config/example.json  # Example real-guest configuration
 tests/               # Automated tests that do not require Android
 scripts/run.py       # Source-tree launcher
+packaging/           # Windows PyInstaller build files
+run_windows.bat      # Windows source launcher
 logs/                # Local QEMU serial/application logs (ignored by Git)
 images/              # User-provided guest media (ignored by Git)
 ```
@@ -55,11 +85,13 @@ images/              # User-provided guest media (ignored by Git)
 ## Requirements on Windows
 
 - Windows 10/11 x64.
-- Python 3.11+ recommended.
-- A QEMU build containing `qemu-system-x86_64.exe`.
-- Android Debug Bridge (`adb.exe`), normally from the Android SDK Platform-Tools.
-- A user-provided Android x86_64 ISO or compatible disk image.
+- Python 3.11+ recommended for running from source.
+- A QEMU build containing `qemu-system-x86_64.exe` for the real Android boot test.
+- Android Debug Bridge (`adb.exe`), normally from the Android SDK Platform-Tools, for the real Android/ADB test.
+- A user-provided Android x86_64 ISO or compatible disk image for the real guest test.
 - For acceleration, Windows Hypervisor Platform must be installed/enabled. QEMU documents WHPX as its Windows hardware-acceleration backend.
+
+The PyInstaller test package itself does **not** require Python to launch the packaged EXE. It still requires QEMU, ADB, and an Android guest image only when you press Start and attempt the real Android boot.
 
 QEMU's current documentation recommends checking the capabilities of the installed binary itself (`-machine help`, `-device help`, etc.) instead of assuming that every build exposes identical devices. AndroidNova therefore keeps optional QEMU arguments configurable rather than inventing guest-specific boot flags.
 
@@ -170,17 +202,18 @@ Run them with the Python standard library:
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-A real Android boot has not been marked as successful by the repository tests. It requires the external QEMU, ADB and Android x86_64 guest media on the test computer.
+The Windows packaging workflow additionally verifies the PyInstaller output and starts the packaged GUI for a short smoke test. A real Android boot still requires external QEMU, ADB and Android x86_64 guest media on the test computer.
 
 ## Current limitations
 
-1. No Android image is included in the repository.
+1. No Android image is included in the repository or test package.
 2. No automatic image download is performed.
-3. The code cannot certify bootability of an arbitrary Android ISO/disk before actually launching it.
-4. Android guest-specific resolution, GPU acceleration, sensors and gaming optimizations are not yet implemented.
-5. Keyboard/mouse integration currently relies on QEMU's standard PC input devices and has not yet been tuned for Android gaming.
-6. Persistent Android disk installation and snapshot management are not yet implemented.
-7. Google Play/Google Games support requires a separately validated Android build and licensing/distribution review.
+3. No QEMU or ADB binary is bundled in the test package.
+4. The code cannot certify bootability of an arbitrary Android ISO/disk before actually launching it.
+5. Android guest-specific resolution, GPU acceleration, sensors and gaming optimizations are not yet implemented.
+6. Keyboard/mouse integration currently relies on QEMU's standard PC input devices and has not yet been tuned for Android gaming.
+7. Persistent Android disk installation and snapshot management are not yet implemented.
+8. Google Play/Google Games support requires a separately validated Android build and licensing/distribution review.
 
 ## Stage 2 acceptance criterion
 
