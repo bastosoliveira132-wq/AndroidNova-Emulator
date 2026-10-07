@@ -16,14 +16,14 @@ The repository does **not** contain, download, or redistribute an Android system
 
 The desktop application now performs a Windows environment check at startup and shows, separately:
 
-- **QEMU** — detects `qemu-system-x86_64.exe` from the configured path, `PATH`, and common Windows installation locations, and probes its version.
+- **QEMU** — detects only the real `qemu-system-x86_64.exe` from the configured path, `PATH`, and common Windows installation locations, and probes its version. A `qemu-w64-setup-*.exe` installer is explicitly rejected.
 - **ADB** — detects `adb.exe` from the configured path, `PATH`, and the common Android SDK `platform-tools` location, and probes its version.
-- **Android guest media** — checks the configured image path and the repository `images/` directory for a non-empty supported ISO/disk-image candidate.
+- **Android guest media** — checks the configured image path and the repository `images/` directory for a non-empty supported image. ISO files are additionally checked for an ISO9660 `CD001` volume signature before being accepted.
 - **WHPX** — checks whether the Windows Hypervisor Platform optional feature is enabled.
 
 The GUI includes **Configurar / procurar componentes**, which opens a setup assistant. It lets the user browse for `qemu-system-x86_64.exe`, `adb.exe`, and the user-provided Android x86_64 image, then saves those paths to `config/local.json`.
 
-The media detector intentionally reports an image as a **candidate**. A filename or extension cannot prove that arbitrary bytes are a bootable Android x86_64 system. The final proof remains the real QEMU boot test. AndroidNova never downloads or bundles the guest image.
+The media detector is deliberately strict enough to reject an empty or obviously invalid ISO before QEMU starts. It still cannot prove that arbitrary bytes contain a bootable Android x86_64 system; the final proof remains the real QEMU boot test. AndroidNova never downloads or bundles the guest image.
 
 The detector does not recursively scan the whole Windows filesystem. Automatic detection is limited to `PATH`, configured paths, common QEMU/Android SDK locations, and the project's `images/` directory. This keeps startup predictable and avoids unexpectedly scanning unrelated user data.
 
@@ -117,7 +117,7 @@ The PyInstaller test package itself does **not** require Python to launch the pa
 
 ## Installing QEMU and ADB
 
-Install QEMU using a trusted Windows distribution or build it yourself. Put the QEMU `bin` directory on `PATH`, or set `paths.qemu` to the full path of `qemu-system-x86_64.exe`.
+Install QEMU using a trusted Windows distribution or build it yourself. Put the QEMU `bin` directory on `PATH`, or set `paths.qemu` to the full path of `qemu-system-x86_64.exe`. **Do not set this field to the QEMU installer** (`qemu-w64-setup-*.exe`); the installer is not the emulator process.
 
 Official QEMU downloads and Windows installation guidance are available at [QEMU Download](https://www.qemu.org/download/).
 
@@ -141,9 +141,9 @@ If WHPX acceleration is enabled, also verify that the Windows Hypervisor Platfor
 5. Select the QEMU executable, ADB executable, and Android x86_64 image when they are not detected automatically.
 6. Click **Salvar configuração**.
 
-The saved local paths go into `config/local.json`, which is local configuration and must not contain credentials or protected guest media.
+The saved local paths go into `config/local.json`, which is local configuration and must not contain credentials or protected guest media. VM RAM, CPU count, resolution preference, audio, network, and ADB port are persisted there as well.
 
-AndroidNova validates that the selected guest file exists, is readable, and is not empty before starting QEMU. It cannot certify that arbitrary bytes are bootable Android x86_64 before the real boot.
+AndroidNova validates that the selected guest file exists, is readable, is not empty, and, for ISO files, has the expected ISO9660 volume signature before starting QEMU.
 
 ## Run AndroidNova
 
@@ -194,7 +194,7 @@ The application also performs this connection itself and checks `adb devices` pl
 
 AndroidNova deliberately does not hard-code a kernel/initrd/EFI combination that has not been verified against the supplied Android build. A bootable Android-x86 ISO normally contains the bootloader/kernel needed to start from CD-ROM, while custom disk/kernel layouts may require different firmware or boot arguments.
 
-If a particular Android build requires extra QEMU options, place them in `qemu.extra_args` after validating them against the installed QEMU binary and that guest build. QEMU's documentation explicitly supports inspecting available machines/devices with `-machine help` and `-device help`.
+For ISO media, AndroidNova explicitly tells QEMU to boot from the CD-ROM (`-cdrom ... -boot order=d`). If a particular Android build requires extra QEMU options, place them in `qemu.extra_args` after validating them against the installed QEMU binary and that guest build. QEMU's documentation explicitly supports inspecting available machines/devices with `-machine help` and `-device help`.
 
 ## Display, audio and network
 
@@ -207,11 +207,12 @@ If a particular Android build requires extra QEMU options, place them in `qemu.e
 
 The automated tests do **not** claim that Android boots. They test only deterministic host-side behaviour such as:
 
-- JSON configuration round trips and validation;
+- JSON configuration round trips and validation, including VM paths/settings and ADB port;
+- real QEMU executable discovery versus the QEMU installer;
 - ISO versus disk command construction;
+- ISO empty/invalid-media rejection;
 - configured ADB port forwarding;
 - serial log configuration;
-- rejection of missing/empty guest media;
 - Windows dependency and local guest-media detection.
 
 Run them with the Python standard library:
