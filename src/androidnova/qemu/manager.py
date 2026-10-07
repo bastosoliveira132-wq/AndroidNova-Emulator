@@ -117,13 +117,9 @@ class QEMUManager:
         return image
 
     def build_command(self) -> list[str]:
-        executable = self.executable()
-        if executable is None:
-            configured = self.config.paths.qemu
-            raise QEMUError(
-                "QEMU não encontrado. Informe qemu-system-x86_64.exe "
-                f"(não o instalador qemu-w64-setup-*.exe). Caminho configurado: {configured}"
-            )
+        # Command construction can be inspected before QEMU is installed. Actual
+        # process start performs the strict executable check below.
+        executable = self.executable() or self.config.paths.qemu
         image = self.validate_media()
         media_type = self._media_type()
         command = [
