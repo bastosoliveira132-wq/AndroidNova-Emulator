@@ -8,27 +8,41 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 
 from androidnova.core.emulator import EmulatorCore
+from androidnova.diagnostics import detect_environment
+from androidnova.ui.setup_wizard import SetupWizard
 
 
 class MainWindow:
-    def __init__(self, root: tk.Tk, core: EmulatorCore) -> None:
+    def __init__(self, root: tk.Tk, core: EmulatorCore, config_path: Path, project_root: Path) -> None:
         self.root = root
         self.core = core
+        self.config_path = config_path
+        self.project_root = project_root
         self.root.title("AndroidNova Emulator")
-        self.root.geometry("680x520")
-        self.root.minsize(620, 460)
+        self.root.geometry("760x680")
+        self.root.minsize(700, 620)
         self.status = tk.StringVar()
+        self.environment = tk.StringVar(value="Verificando ambiente...")
         self._build()
         self._refresh_status()
+        self._refresh_environment()
 
     def _build(self) -> None:
         frame = tk.Frame(self.root, padx=18, pady=18)
         frame.pack(fill="both", expand=True)
         tk.Label(frame, text="AndroidNova Emulator", font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        tk.Label(frame, text="QEMU + Android x86_64 + ADB", font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 14))
+        tk.Label(frame, text="QEMU + Android x86_64 + ADB", font=("Segoe UI", 10)).pack(anchor="w", pady=(0, 10))
+
+        env = tk.LabelFrame(frame, text="Ambiente Windows", padx=12, pady=10)
+        env.pack(fill="x")
+        tk.Label(env, textvariable=self.environment, justify="left", anchor="w", wraplength=700).pack(fill="x")
+        env_buttons = tk.Frame(env, pady=(8, 0))
+        env_buttons.pack(fill="x")
+        tk.Button(env_buttons, text="Configurar / procurar componentes", command=self._open_setup).pack(side="left")
+        tk.Button(env_buttons, text="Verificar", command=self._refresh_environment).pack(side="left", padx=8)
 
         settings = tk.LabelFrame(frame, text="VM configuration", padx=12, pady=10)
-        settings.pack(fill="x")
+        settings.pack(fill="x", pady=(12, 0))
         self._field(settings, "RAM (MB)", str(self.core.config.vm.ram_mb), 0, self._set_ram)
         self._field(settings, "CPU cores", str(self.core.config.vm.cpu_count), 1, self._set_cpu)
         self._field(settings, "Resolution", self.core.config.vm.resolution, 2, self._set_resolution)
@@ -48,8 +62,8 @@ class MainWindow:
         tk.Label(status_box, textvariable=self.status, justify="left", font=("Segoe UI", 11, "bold"), anchor="w").pack(fill="x")
         tk.Label(
             frame,
-            text="The first real-boot test requires a user-provided Android x86_64 image and installed QEMU/ADB. AndroidNova does not download or redistribute the guest image.",
-            wraplength=620,
+            text="O primeiro boot real exige uma imagem Android x86_64 fornecida pelo usuário e QEMU/ADB instalados. O AndroidNova não baixa nem redistribui a imagem.",
+            wraplength=700,
             justify="left",
         ).pack(anchor="w", pady=(12, 0))
 
@@ -82,6 +96,19 @@ class MainWindow:
 
     def _set_adb_port(self, value: str) -> None:
         self._apply(lambda v: setattr(self.core.config.adb, "port", int(v)), value, "Invalid ADB port")
+
+    def _open_setup(self) -> None:
+        SetupWizard(self.root, self.core.config, self.config_path, self.project_root, self._refresh_environment)
+
+    def _refresh_environment(self) -> None:
+        try:
+            status = detect_environment(self.core.config, self.project_root)
+            qemu = f"OK: {status.qemu.path}" if status.qemu.found else "FALTA: QEMU"
+            adb = f"OK: {status.adb.path}" if status.adb.found else "FALTA: ADB"
+            guest = f"OK: {status.guest.path}" if status.guest.found else "FALTA: imagem Android x86_64"
+            self.environment.set(f"{qemu}\n{adb}\n{guest}\nWHPX: {'detectado/consultado' if status.whpx else 'não confirmado'}")
+        except Exception as exc:
+            self.environment.set(f"Não foi possível verificar o ambiente: {exc}")
 
     def _start(self) -> None:
         try:
@@ -121,9 +148,9 @@ class MainWindow:
         self.root.after(1000, self._refresh_status)
 
 
-def create_window(config_path: Path) -> tk.Tk:
+def create_window(config_path: Path, project_root: Path) -> tk.Tk:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     core = EmulatorCore.from_file(config_path)
     root = tk.Tk()
-    MainWindow(root, core)
+    MainWindow(root, core, config_path, project_root)
     return root
