@@ -19,15 +19,17 @@ class EmulatorStatus:
 
 
 class EmulatorCore:
-    def __init__(self, config: AppConfig, logger: logging.Logger | None = None) -> None:
+    def __init__(self, config: AppConfig, logger: logging.Logger | None = None, base_dir: Path | None = None) -> None:
         self.config = config
         self.logger = logger or logging.getLogger("androidnova")
-        self.qemu = QEMUManager(config, self.logger.info)
+        self.qemu = QEMUManager(config, self.logger.info, base_dir=base_dir)
         self.adb = ADBManager(config)
 
     @classmethod
     def from_file(cls, path: Path) -> "EmulatorCore":
-        return cls(load_config(path))
+        # local.json lives in <project>/config, so relative media/log paths are
+        # resolved against <project>, not against whatever directory launched the EXE.
+        return cls(load_config(path), base_dir=path.resolve().parent.parent)
 
     def save(self, path: Path) -> None:
         save_config(self.config, path)
@@ -56,7 +58,6 @@ class EmulatorCore:
             devices = self.adb.devices_with_state()
         except ADBError:
             return EmulatorStatus("executando", "inicializando", "indisponível")
-
         target = f"{self.config.adb.host}:{self.config.adb.port}"
         state = devices.get(target)
         if state == "device":
