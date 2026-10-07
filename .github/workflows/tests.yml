@@ -20,3 +20,10 @@ jobs:
       - name: Run unit and UI smoke tests
         shell: pwsh
         run: python -m unittest discover -s tests -p "test_*.py"
+      - name: Run source launcher smoke test
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath "python" -ArgumentList "scripts\run.py" -WorkingDirectory $PWD -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) { throw "Source launcher exited during startup smoke test with code $($process.ExitCode)" }
+          Stop-Process -Id $process.Id -Force
