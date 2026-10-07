@@ -12,9 +12,24 @@ AndroidNova -> QEMU -> Android x86_64 guest -> ADB
 
 The repository does **not** contain, download, or redistribute an Android system image. The user must obtain a compatible image from its publisher and configure its local path.
 
+## Windows readiness and setup assistant
+
+The desktop application now performs a Windows environment check at startup and shows, separately:
+
+- **QEMU** — detects `qemu-system-x86_64.exe` from the configured path, `PATH`, and common Windows installation locations, and probes its version.
+- **ADB** — detects `adb.exe` from the configured path, `PATH`, and the common Android SDK `platform-tools` location, and probes its version.
+- **Android guest media** — checks the configured image path and the repository `images/` directory for a non-empty supported ISO/disk-image candidate.
+- **WHPX** — checks whether the Windows Hypervisor Platform optional feature is enabled.
+
+The GUI includes **Configurar / procurar componentes**, which opens a setup assistant. It lets the user browse for `qemu-system-x86_64.exe`, `adb.exe`, and the user-provided Android x86_64 image, then saves those paths to `config/local.json`.
+
+The media detector intentionally reports an image as a **candidate**. A filename or extension cannot prove that arbitrary bytes are a bootable Android x86_64 system. The final proof remains the real QEMU boot test. AndroidNova never downloads or bundles the guest image.
+
+The detector does not recursively scan the whole Windows filesystem. Automatic detection is limited to `PATH`, configured paths, common QEMU/Android SDK locations, and the project's `images/` directory. This keeps startup predictable and avoids unexpectedly scanning unrelated user data.
+
 ## Windows test package
 
-The repository now includes a Windows packaging path based on PyInstaller. The generated package is a desktop-interface test build; it does **not** bundle QEMU, ADB, or an Android system image.
+The repository includes a Windows packaging path based on PyInstaller. The generated package is a desktop-interface test build; it does **not** bundle QEMU, ADB, or an Android system image.
 
 On Windows, the packaging script is:
 
@@ -46,8 +61,6 @@ The simplest supported first test is a **bootable Android x86_64 ISO** (`.iso`).
 
 The project can also boot a local disk image. For disk media, the configured QEMU format must match the actual file (`qcow2` by default, with `raw`, `vmdk`, `vdi`, and `vhdx` supported by configuration). AndroidNova does not convert or manufacture an Android disk image for the user.
 
-For the first milestone, prefer an Android x86_64 ISO because it avoids pretending that an arbitrary `.qcow2` file is a valid Android guest. The Android-x86 documentation also describes QEMU/KVM execution of an ISO and ADB through TCP port 5555.
-
 ## Architecture
 
 ```text
@@ -56,12 +69,18 @@ Tkinter GUI
     v
 EmulatorCore ---- Configuration
     |
-    +---- QEMU Manager ---- QEMU process + serial log
+    +---- Environment Detector -- QEMU / ADB / guest media / WHPX
     |
-    +---- ADB Manager ----- adb executable -> Android guest
+    +---- Setup Wizard ---------- user-selected local paths
     |
-    +---- Runtime status -- QEMU / Android boot / ADB state
+    +---- QEMU Manager ---------- QEMU process + serial log
+    |
+    +---- ADB Manager ----------- adb executable -> Android guest
+    |
+    +---- Runtime status -------- QEMU / Android boot / ADB state
 ```
+
+The new environment detector and setup wizard are additive. The existing `EmulatorCore`, QEMU manager, ADB manager, configuration model, and Tkinter application remain the control architecture for the emulator.
 
 ## Project layout
 
@@ -71,7 +90,8 @@ src/androidnova/
 ├── config/          # JSON configuration model and validation
 ├── core/            # Emulator lifecycle and runtime state
 ├── qemu/            # QEMU media validation, command construction and process control
-├── ui/              # Tkinter desktop interface
+├── ui/              # Tkinter desktop interface and setup assistant
+├── diagnostics.py   # Windows QEMU/ADB/media/WHPX detection
 └── main.py          # Application entry point
 config/example.json  # Example real-guest configuration
 tests/               # Automated tests that do not require Android
@@ -91,15 +111,17 @@ images/              # User-provided guest media (ignored by Git)
 - A user-provided Android x86_64 ISO or compatible disk image for the real guest test.
 - For acceleration, Windows Hypervisor Platform must be installed/enabled. QEMU documents WHPX as its Windows hardware-acceleration backend.
 
-The PyInstaller test package itself does **not** require Python to launch the packaged EXE. It still requires QEMU, ADB, and an Android guest image only when you press Start and attempt the real Android boot.
+QEMU's current Windows documentation states that only 64-bit Windows is supported and documents WHPX as the Windows hardware acceleration backend. The Android Platform-Tools package provides `adb.exe`; the current Windows package is available from the official Android Developers site.
 
-QEMU's current documentation recommends checking the capabilities of the installed binary itself (`-machine help`, `-device help`, etc.) instead of assuming that every build exposes identical devices. AndroidNova therefore keeps optional QEMU arguments configurable rather than inventing guest-specific boot flags.
+The PyInstaller test package itself does **not** require Python to launch the packaged EXE. It still requires QEMU, ADB, and an Android guest image only when you press Start and attempt the real Android boot.
 
 ## Installing QEMU and ADB
 
 Install QEMU using a trusted Windows distribution or build it yourself. Put the QEMU `bin` directory on `PATH`, or set `paths.qemu` to the full path of `qemu-system-x86_64.exe`.
 
-Install Android SDK Platform-Tools and put its directory on `PATH`, or set `paths.adb` to the full path of `adb.exe`.
+Official QEMU downloads and Windows installation guidance are available at [QEMU Download](https://www.qemu.org/download/).
+
+Install the current Android SDK Platform-Tools package for Windows. It contains `adb.exe`. The official download is available from [Android Developers — SDK Platform-Tools](https://developer.android.com/tools/releases/platform-tools).
 
 Verify independently before starting AndroidNova:
 
@@ -114,19 +136,14 @@ If WHPX acceleration is enabled, also verify that the Windows Hypervisor Platfor
 
 1. Obtain a compatible Android x86_64 image from its publisher.
 2. Do **not** commit the image to this repository.
-3. Place it somewhere local, for example:
+3. You can place it in the local `images/` directory or keep it anywhere else on the Windows machine.
+4. Open **Configurar / procurar componentes** in AndroidNova.
+5. Select the QEMU executable, ADB executable, and Android x86_64 image when they are not detected automatically.
+6. Click **Salvar configuração**.
 
-```text
-AndroidNova-Emulator/
-└── images/
-    └── android-x86_64.iso
-```
+The saved local paths go into `config/local.json`, which is local configuration and must not contain credentials or protected guest media.
 
-4. Copy `config/example.json` to `config/local.json` if the launcher has not created it yet.
-5. Set `paths.android_image` to the real local path.
-6. Leave `qemu.media_type` as `auto` for an `.iso`, or explicitly use `iso`.
-
-AndroidNova validates that the file exists, is readable, and is not empty before starting QEMU. It cannot prove that arbitrary bytes constitute a bootable Android system; that validation ultimately requires QEMU/guest boot testing.
+AndroidNova validates that the selected guest file exists, is readable, and is not empty before starting QEMU. It cannot certify that arbitrary bytes are bootable Android x86_64 before the real boot.
 
 ## Run AndroidNova
 
@@ -136,7 +153,7 @@ From the repository root:
 python scripts/run.py
 ```
 
-The GUI exposes RAM, CPU count, resolution, Android media path and ADB port. The runtime panel reports the actual lifecycle independently:
+The GUI first reports the host readiness state. A typical clean machine will show QEMU, ADB, and the Android image as **FALTA**. After installation/configuration they should show **OK**. The runtime panel separately reports the actual emulator lifecycle:
 
 ```text
 QEMU: parado
@@ -194,7 +211,8 @@ The automated tests do **not** claim that Android boots. They test only determin
 - ISO versus disk command construction;
 - configured ADB port forwarding;
 - serial log configuration;
-- rejection of missing/empty guest media.
+- rejection of missing/empty guest media;
+- Windows dependency and local guest-media detection.
 
 Run them with the Python standard library:
 
