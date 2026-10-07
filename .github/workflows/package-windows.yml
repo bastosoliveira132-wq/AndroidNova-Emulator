@@ -1,0 +1,49 @@
+name: Windows test package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build dependency
+        shell: pwsh
+        run: py -3 -m pip install -r packaging\requirements-build.txt
+
+      - name: Build Windows package
+        shell: pwsh
+        run: .\packaging\build_windows.ps1
+
+      - name: Verify packaged files
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist\AndroidNova-Emulator\AndroidNova-Emulator.exe"
+          if (-not (Test-Path $exe)) { throw "Packaged executable not found: $exe" }
+          if (-not (Test-Path (Join-Path $PWD "dist\AndroidNova-Emulator\config\example.json"))) { throw "Bundled example configuration not found" }
+
+      - name: Smoke test GUI startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist\AndroidNova-Emulator\AndroidNova-Emulator.exe"
+          $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+          Start-Sleep -Seconds 5
+          if ($process.HasExited) { throw "AndroidNova GUI exited during startup smoke test with code $($process.ExitCode)" }
+          Stop-Process -Id $process.Id -Force
+
+      - name: Upload test ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: AndroidNova-Emulator-Test
+          path: dist/AndroidNova-Emulator-Test.zip
+          if-no-files-found: error
