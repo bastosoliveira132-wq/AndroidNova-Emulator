@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox
 
 from androidnova.core.emulator import EmulatorCore
 from androidnova.diagnostics import detect_environment
+from androidnova.qemu.manager import QEMUError
 from androidnova.ui.setup_wizard import SetupWizard
 
 
@@ -25,8 +26,6 @@ class MainWindow:
         self.environment = tk.StringVar(value="Verificando ambiente...")
         self._build()
         self._refresh_status()
-        # Run dependency probing after the window is created so a slow Windows
-        # probe (for example DISM/WHPX) cannot prevent the GUI from appearing.
         self.root.after(50, self._refresh_environment)
 
     def _build(self) -> None:
@@ -38,8 +37,6 @@ class MainWindow:
         env = tk.LabelFrame(frame, text="Ambiente Windows", padx=12, pady=10)
         env.pack(fill="x")
         tk.Label(env, textvariable=self.environment, justify="left", anchor="w", wraplength=700).pack(fill="x")
-        # ``pady`` on the Frame constructor expects one Tk distance. A tuple
-        # such as (8, 0) belongs to pack()/grid(), not the widget constructor.
         env_buttons = tk.Frame(env)
         env_buttons.pack(fill="x", pady=(8, 0))
         tk.Button(env_buttons, text="Configurar / procurar componentes", command=self._open_setup).pack(side="left")
@@ -67,8 +64,7 @@ class MainWindow:
         tk.Label(
             frame,
             text="O primeiro boot real exige uma imagem Android x86_64 fornecida pelo usuário e QEMU/ADB instalados. O AndroidNova não baixa nem redistribui a imagem.",
-            wraplength=700,
-            justify="left",
+            wraplength=700, justify="left",
         ).pack(anchor="w", pady=(12, 0))
 
     def _field(self, parent: tk.Widget, label: str, value: str, row: int, callback) -> None:
@@ -79,11 +75,19 @@ class MainWindow:
         tk.Button(parent, text="Apply", command=lambda: callback(entry.get())).grid(row=row, column=2, padx=8)
         parent.grid_columnconfigure(1, weight=1)
 
+    def _persist(self) -> None:
+        try:
+            self.core.save(self.config_path)
+        except (ValueError, OSError) as exc:
+            raise RuntimeError(f"Não foi possível salvar a configuração: {exc}") from exc
+
     def _apply(self, setter, value: str, title: str) -> None:
         try:
             setter(value)
             self.core.config.validate()
-        except (ValueError, TypeError) as exc:
+            self._persist()
+            self._refresh_environment()
+        except (ValueError, TypeError, RuntimeError) as exc:
             messagebox.showerror(title, str(exc))
 
     def _set_ram(self, value: str) -> None:
@@ -96,7 +100,7 @@ class MainWindow:
         self._apply(lambda v: setattr(self.core.config.vm, "resolution", v), value, "Invalid resolution")
 
     def _set_image(self, value: str) -> None:
-        self.core.config.paths.android_image = value.strip()
+        self._apply(lambda v: setattr(self.core.config.paths, "android_image", v.strip()), value, "Invalid Android image")
 
     def _set_adb_port(self, value: str) -> None:
         self._apply(lambda v: setattr(self.core.config.adb, "port", int(v)), value, "Invalid ADB port")
@@ -107,21 +111,35 @@ class MainWindow:
     def _refresh_environment(self) -> None:
         try:
             status = detect_environment(self.core.config, self.project_root)
-            qemu = f"OK: {status.qemu.path}" if status.qemu.found else "FALTA: QEMU"
-            adb = f"OK: {status.adb.path}" if status.adb.found else "FALTA: ADB"
-            guest = f"OK: {status.guest.path}" if status.guest.found else "FALTA: imagem Android x86_64"
-            self.environment.set(f"{qemu}\n{adb}\n{guest}\nWHPX: {'detectado/consultado' if status.whpx else 'não confirmado'}")
+            qemu = (
+                f"[OK] QEMU — {status.qemu.message}\n    Caminho: {status.qemu.path}"
+                if status.qemu.found else f"[FALTA] QEMU — {status.qemu.message}"
+            )
+            adb = (
+                f"[OK] ADB — {status.adb.message}\n    Caminho: {status.adb.path}"
+                if status.adb.found else f"[FALTA] ADB — {status.adb.message}"
+            )
+            guest = (
+                f"[OK] Imagem Android — {status.guest.message}\n    Caminho: {status.guest.path}"
+                if status.guest.found else f"[FALTA] Imagem Android — {status.guest.message}"
+            )
+            self.environment.set(f"{qemu}\n\n{adb}\n\n{guest}\n\n[{'OK' if status.whpx else 'INFO'}] WHPX: {'detectado' if status.whpx else 'não confirmado'}")
         except Exception as exc:
             self.environment.set(f"Não foi possível verificar o ambiente: {exc}")
 
     def _start(self) -> None:
         try:
+            self._persist()
+            self._refresh_environment()
             self.core.start()
+        except (QEMUError, OSError, ValueError, RuntimeError) as exc:
+            messagebox.showerror("Falha ao iniciar AndroidNova", str(exc))
         except Exception as exc:
-            messagebox.showerror("Unable to start", str(exc))
+            messagebox.showerror("Falha inesperada ao iniciar", str(exc))
 
     def _restart(self) -> None:
         try:
+            self._persist()
             self.core.restart()
         except Exception as exc:
             messagebox.showerror("Unable to restart", str(exc))
