@@ -9,16 +9,22 @@
   "paths": {
     "qemu": "qemu-system-x86_64",
     "adb": "adb",
-    "android_image": "images/android.qcow2"
+    "android_image": "images/android-x86_64.iso",
+    "serial_log": "logs/qemu-serial.log"
   },
   "qemu": {
     "machine": "q35",
     "acceleration": true,
+    "accelerator": "whpx",
     "display_backend": "sdl",
+    "media_type": "auto",
+    "disk_format": "qcow2",
     "extra_args": []
   },
   "adb": {
     "host": "127.0.0.1",
-    "port": 5555
+    "port": 5555,
+    "connect_timeout_seconds": 90,
+    "poll_interval_seconds": 2.0
   }
 }
