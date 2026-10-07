@@ -40,12 +40,22 @@ try {
     Invoke-Build $false
     Invoke-Build $true
 
-    $root = Join-Path (Get-Location) "dist"
-    $normal = Join-Path $root "AndroidNova\AndroidNova.exe"
-    $debug = Join-Path $root "AndroidNova-debug\AndroidNova-debug.exe"
-    $zip = Join-Path $root "AndroidNova-Emulator-Test.zip"
+    $normalDir = Join-Path $dist "AndroidNova"
+    $debugDir = Join-Path $dist "AndroidNova-debug"
+    $normal = Join-Path $normalDir "AndroidNova.exe"
+    $debug = Join-Path $debugDir "AndroidNova-debug.exe"
+    $package = Join-Path $dist "AndroidNova-Emulator-Test"
+    $zip = Join-Path $dist "AndroidNova-Emulator-Test.zip"
+
+    if (-not (Test-Path $normal)) { throw "Normal executable missing: $normal" }
+    if (-not (Test-Path $debug)) { throw "Diagnostic executable missing: $debug" }
+    if (Test-Path $package) { Remove-Item $package -Recurse -Force }
+    New-Item -ItemType Directory -Path $package | Out-Null
+    Copy-Item $normalDir (Join-Path $package "AndroidNova") -Recurse
+    Copy-Item $debugDir (Join-Path $package "AndroidNova-debug") -Recurse
+    Copy-Item README.md (Join-Path $package "README.md")
     if (Test-Path $zip) { Remove-Item $zip -Force }
-    Compress-Archive -Path @($normal, $debug, (Join-Path $root "AndroidNova\*"), (Join-Path $root "AndroidNova-debug\*")) -DestinationPath $zip -CompressionLevel Optimal
+    Compress-Archive -Path (Join-Path $package "*") -DestinationPath $zip -CompressionLevel Optimal
     Write-Host "Created $zip"
 } catch {
     Write-Error $_
