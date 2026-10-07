@@ -55,13 +55,7 @@ From the repository root:
 python scripts/run.py
 ```
 
-Or:
-
-```powershell
-python -m src.androidnova.main
-```
-
-Open **Settings** by editing `config/local.json` (created from `config/example.json` when needed), or use the GUI fields for the basic VM parameters.
+The launcher adds `src` to Python's import path, creates `config/local.json` from the example when needed, and opens the GUI.
 
 ## Configuration
 
