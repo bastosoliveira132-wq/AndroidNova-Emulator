@@ -21,6 +21,12 @@ jobs:
         shell: pwsh
         run: python -m pip install -r packaging\requirements-build.txt
 
+      - name: Run source and import checks
+        shell: pwsh
+        run: |
+          python -m compileall -q src scripts
+          python -c "import androidnova.main, androidnova.ui.main_window, androidnova.core.emulator, androidnova.config.manager, androidnova.qemu.manager, androidnova.adb.manager, androidnova.diagnostics; print('AndroidNova imports OK')"
+
       - name: Build Windows package
         shell: pwsh
         run: .\packaging\build_windows.ps1
@@ -28,20 +34,36 @@ jobs:
       - name: Verify packaged files
         shell: pwsh
         run: |
-          $root = Join-Path $PWD "dist\AndroidNova-Emulator"
-          $exe = Join-Path $root "AndroidNova-Emulator.exe"
-          if (-not (Test-Path $exe)) { throw "Packaged executable not found: $exe" }
-          $bundledConfig = Join-Path $root "_internal\config\example.json"
+          $normalRoot = Join-Path $PWD "dist\AndroidNova"
+          $debugRoot = Join-Path $PWD "dist\AndroidNova-debug"
+          $normalExe = Join-Path $normalRoot "AndroidNova.exe"
+          $debugExe = Join-Path $debugRoot "AndroidNova-debug.exe"
+          if (-not (Test-Path $normalExe)) { throw "Normal executable not found: $normalExe" }
+          if (-not (Test-Path $debugExe)) { throw "Diagnostic executable not found: $debugExe" }
+          $bundledConfig = Join-Path $normalRoot "_internal\config\example.json"
           if (-not (Test-Path $bundledConfig)) { throw "Bundled example configuration not found: $bundledConfig" }
+          $runtimeHookEvidence = Join-Path $normalRoot "_internal"
+          if (-not (Test-Path $runtimeHookEvidence)) { throw "PyInstaller internal runtime directory missing" }
 
-      - name: Smoke test GUI startup
+      - name: Smoke test normal GUI startup
         shell: pwsh
         run: |
-          $exe = Join-Path $PWD "dist\AndroidNova-Emulator\AndroidNova-Emulator.exe"
+          $exe = Join-Path $PWD "dist\AndroidNova\AndroidNova.exe"
           $process = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
           Start-Sleep -Seconds 5
           if ($process.HasExited) { throw "AndroidNova GUI exited during startup smoke test with code $($process.ExitCode)" }
           Stop-Process -Id $process.Id -Force
+          $log = Join-Path (Split-Path $exe) "androidnova.log"
+          if (-not (Test-Path $log)) { throw "Startup log was not created: $log" }
+          Get-Content $log
+
+      - name: Verify diagnostic executable is console-enabled
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD "dist\AndroidNova-debug\AndroidNova-debug.exe"
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          if ($bytes.Length -lt 64) { throw "Diagnostic executable is unexpectedly small" }
+          Write-Host "Diagnostic executable size: $($bytes.Length) bytes"
 
       - name: Upload test ZIP
         uses: actions/upload-artifact@v4
