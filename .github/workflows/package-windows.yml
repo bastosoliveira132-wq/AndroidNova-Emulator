@@ -15,11 +15,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install build dependency
         shell: pwsh
-        run: py -3 -m pip install -r packaging\requirements-build.txt
+        run: python -m pip install -r packaging\requirements-build.txt
 
       - name: Build Windows package
         shell: pwsh
@@ -28,9 +28,11 @@ jobs:
       - name: Verify packaged files
         shell: pwsh
         run: |
-          $exe = Join-Path $PWD "dist\AndroidNova-Emulator\AndroidNova-Emulator.exe"
+          $root = Join-Path $PWD "dist\AndroidNova-Emulator"
+          $exe = Join-Path $root "AndroidNova-Emulator.exe"
           if (-not (Test-Path $exe)) { throw "Packaged executable not found: $exe" }
-          if (-not (Test-Path (Join-Path $PWD "dist\AndroidNova-Emulator\config\example.json"))) { throw "Bundled example configuration not found" }
+          $bundledConfig = Join-Path $root "_internal\config\example.json"
+          if (-not (Test-Path $bundledConfig)) { throw "Bundled example configuration not found: $bundledConfig" }
 
       - name: Smoke test GUI startup
         shell: pwsh
