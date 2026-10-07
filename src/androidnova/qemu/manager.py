@@ -62,7 +62,7 @@ class QEMUManager:
         if media_type == "iso":
             command.extend(["-cdrom", str(image)])
         else:
-            command.extend(["-drive", f"file={image},format=qcow2,if=virtio"])
+            command.extend(["-drive", f"file={image},format={self.config.qemu.disk_format},if=virtio"])
 
         if self.config.vm.network:
             command.extend([
