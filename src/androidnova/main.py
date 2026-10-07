@@ -3,13 +3,21 @@
 from __future__ import annotations
 
 import json
-import shutil
+import sys
 from pathlib import Path
 
-from androidnova.config.manager import load_config, save_config
+from androidnova.config.manager import load_config
 from androidnova.ui.main_window import create_window
 
-ROOT = Path(__file__).resolve().parents[2]
+
+def application_root() -> Path:
+    """Return the writable application directory for source and PyInstaller builds."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]
+
+
+ROOT = application_root()
 CONFIG_DIR = ROOT / "config"
 CONFIG_PATH = CONFIG_DIR / "local.json"
 EXAMPLE_PATH = CONFIG_DIR / "example.json"
@@ -27,7 +35,7 @@ def ensure_config() -> Path:
 def main() -> None:
     config_path = ensure_config()
     load_config(config_path)
-    root = create_window(config_path)
+    root = create_window(config_path, ROOT)
     root.mainloop()
 
 
