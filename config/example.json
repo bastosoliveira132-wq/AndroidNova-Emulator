@@ -1,0 +1,24 @@
+{
+  "vm": {
+    "ram_mb": 4096,
+    "cpu_count": 4,
+    "resolution": "1280x720",
+    "audio": true,
+    "network": true
+  },
+  "paths": {
+    "qemu": "qemu-system-x86_64",
+    "adb": "adb",
+    "android_image": "images/android.qcow2"
+  },
+  "qemu": {
+    "machine": "q35",
+    "acceleration": true,
+    "display_backend": "sdl",
+    "extra_args": []
+  },
+  "adb": {
+    "host": "127.0.0.1",
+    "port": 5555
+  }
+}
