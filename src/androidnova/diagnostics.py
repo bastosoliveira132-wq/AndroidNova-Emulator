@@ -49,21 +49,32 @@ def _candidate_paths(configured: str, names: tuple[str, ...]) -> list[Path]:
         if resolved:
             candidates.append(Path(resolved))
     if os.name == "nt":
-        roots = [
-            Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
-            Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
-            Path(os.environ.get("LOCALAPPDATA", "")),
-        ]
-        for root in roots:
-            for name in names:
-                candidates.extend(root.glob(f"**/{name}"))
+        program_files = Path(os.environ.get("ProgramFiles", r"C:\Program Files"))
+        local_app = Path(os.environ.get("LOCALAPPDATA", ""))
+        user_profile = Path(os.environ.get("USERPROFILE", ""))
+        if "qemu-system-x86_64.exe" in names:
+            candidates.extend([
+                program_files / "qemu" / "qemu-system-x86_64.exe",
+                program_files / "QEMU" / "qemu-system-x86_64.exe",
+            ])
+        if "adb.exe" in names:
+            candidates.extend([
+                local_app / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+                user_profile / "AppData" / "Local" / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+            ])
     unique: list[Path] = []
     seen: set[str] = set()
     for path in candidates:
-        key = str(path.resolve()).lower()
-        if key not in seen and path.is_file():
+        if not path:
+            continue
+        try:
+            resolved_path = path.resolve()
+        except OSError:
+            continue
+        key = str(resolved_path).lower()
+        if key not in seen and resolved_path.is_file():
             seen.add(key)
-            unique.append(path.resolve())
+            unique.append(resolved_path)
     return unique
 
 
@@ -103,8 +114,7 @@ def detect_adb(config: AppConfig) -> DependencyStatus:
 def _looks_like_android_media(path: Path) -> bool:
     if not path.is_file() or path.stat().st_size == 0:
         return False
-    suffix = path.suffix.lower()
-    return suffix in {".iso", ".img", ".raw", ".qcow2", ".vmdk", ".vdi", ".vhd", ".vhdx"}
+    return path.suffix.lower() in {".iso", ".img", ".raw", ".qcow2", ".vmdk", ".vdi", ".vhd", ".vhdx"}
 
 
 def detect_guest_media(config: AppConfig, root: Path) -> GuestMediaStatus:
@@ -127,6 +137,23 @@ def detect_guest_media(config: AppConfig, root: Path) -> GuestMediaStatus:
     return GuestMediaStatus(False, None, None, "Nenhuma imagem Android configurada/encontrada")
 
 
+def detect_whpx() -> bool:
+    if os.name != "nt":
+        return False
+    dism = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "dism.exe"
+    try:
+        result = subprocess.run(
+            [str(dism), "/online", "/Get-FeatureInfo", "/FeatureName:HypervisorPlatform"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    output = f"{result.stdout}\n{result.stderr}".lower()
+    return "state : enabled" in output or "estado : habilitado" in output
+
+
 def detect_environment(config: AppConfig, root: Path) -> EnvironmentStatus:
-    whpx = os.name == "nt" and _probe(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "dism.exe", ("/online", "/Get-FeatureInfo", "/FeatureName:HypervisorPlatform")) is not None
-    return EnvironmentStatus(detect_qemu(config), detect_adb(config), detect_guest_media(config, root), whpx)
+    return EnvironmentStatus(detect_qemu(config), detect_adb(config), detect_guest_media(config, root), detect_whpx())
